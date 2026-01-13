@@ -46,6 +46,8 @@ export async function captureScreenshots(url: string): Promise<ScreenshotResult>
         "--disable-dev-shm-usage",
         "--disable-gpu",
         "--single-process",
+        "--no-zygote",
+        "--disable-software-rasterizer",
       ],
       defaultViewport: {
         width: 1920,
@@ -54,6 +56,7 @@ export async function captureScreenshots(url: string): Promise<ScreenshotResult>
       executablePath,
       headless: true,
       ignoreDefaultArgs: ["--disable-extensions"],
+      timeout: 30000,
     })
 
     const page = await browser.newPage()

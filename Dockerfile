@@ -41,7 +41,8 @@ RUN apt-get update && apt-get install -y \
   fonts-freefont-ttf \
   fonts-liberation \
   --no-install-recommends \
-  && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* \
+  && chmod +x /usr/bin/chromium
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs
@@ -50,6 +51,11 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Ensure proper permissions and sync filesystem
+RUN chown -R nextjs:nodejs /app \
+  && chmod -R 755 /app \
+  && sync
 
 USER nextjs
 
