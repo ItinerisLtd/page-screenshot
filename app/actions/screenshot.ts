@@ -21,29 +21,49 @@ function sanitizeFilename(name: string): string {
     .toLowerCase()
 }
 
+const remoteExecutablePath =
+  "https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar"
+
 export async function captureScreenshots(url: string): Promise<ScreenshotResult> {
   let browser = null
 
   try {
-    // Get the executable path for chromium
-    const executablePath = await chromium.executablePath(
-      "https://github.com/nicx/chromium/releases/download/v131.0.2/chromium-v131.0.2-pack.tar",
-    )
+    let executablePath: string
+
+    if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+      // Production: use remote chromium binary
+      executablePath = await chromium.executablePath(remoteExecutablePath)
+    } else {
+      // Local development: try to find local Chrome/Chromium
+      executablePath = await chromium.executablePath(remoteExecutablePath)
+    }
 
     browser = await puppeteer.launch({
-      args: chromium.args,
+      args: [
+        ...chromium.args,
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--single-process",
+      ],
       defaultViewport: {
         width: 1920,
         height: 1080,
       },
       executablePath,
       headless: true,
+      ignoreDefaultArgs: ["--disable-extensions"],
     })
 
     const page = await browser.newPage()
 
     // Set a reasonable timeout
     page.setDefaultNavigationTimeout(30000)
+
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+    )
 
     // Navigate to the page
     await page.goto(url, { waitUntil: "networkidle2" })
@@ -61,11 +81,11 @@ export async function captureScreenshots(url: string): Promise<ScreenshotResult>
       type: "png",
     })
 
+    await browser.close()
+
     // Convert to base64 data URL
     const base64 = Buffer.from(screenshotBuffer).toString("base64")
     const dataUrl = `data:image/png;base64,${base64}`
-
-    await browser.close()
 
     return {
       success: true,
@@ -77,6 +97,8 @@ export async function captureScreenshots(url: string): Promise<ScreenshotResult>
     if (browser) {
       await browser.close()
     }
+
+    console.error("Screenshot capture error:", error)
 
     return {
       success: false,
