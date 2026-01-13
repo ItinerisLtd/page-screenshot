@@ -20,7 +20,10 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-RUN npm run build
+RUN \
+  if [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm run build; \
+  else npm run build; \
+  fi
 
 # Stage 3: Runner with Chromium
 FROM node:20-slim AS runner
@@ -45,7 +48,15 @@ RUN apt-get update && apt-get install -y \
   && chmod +x /usr/bin/chromium
 
 # Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs
+# Set correct permissions for prerender cache
+RUN mkdir -p .next
+RUN chown nextjs:nodejs .next
+
+# Copy built application
+COPY --from=builder /app/public ./public
+
+# Automatically leverage output traces to reduce image size
+# https://nextjs.org/docs/advanced-features/output-file-tracing
 RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
